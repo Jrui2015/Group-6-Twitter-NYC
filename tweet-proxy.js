@@ -20,6 +20,17 @@ io.on('connection', function(socket) {
   socket.on('disconnect', function() {
     console.log('user disconnected');
   });
+
+  MongoClient.connect(url, function(err, db) {
+    assert.equal(null, err);
+    var cursor = db.collection('tweets').find().limit(1000);
+    cursor.toArray(function(err, docs) {
+      for (var i = 0; i < docs.length; i++) {
+        io.emit('tweet', docs[i]);
+      }
+    });
+  });
+
 });
 
 // Setup stream

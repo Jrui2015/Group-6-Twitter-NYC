@@ -62,7 +62,9 @@
    // otherwise you will see stack overflow
    var qtree = d3.geom.quadtree([], -180, -90, 180, 90);
    var socket = io();
+   var tweets = [];
    socket.on('tweet', function(tweet) {
+     tweets.push(tweet);
      if (tweet.coordinates) {
        geoData.features.push({
          id_str: tweet.id_str,
