@@ -6,7 +6,7 @@
   "dependencies": {
     "express": "^4.13.4",
     "mongodb": "^2.1.16",
-    "node-tweet-stream": "^1.10.0",
+    "node-tweet-stream": "robturtle/node-tweet-stream",
     "socket.io": "^1.4.5"
   },
   "devDependencies": {},
