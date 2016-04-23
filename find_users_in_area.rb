@@ -1,7 +1,6 @@
 #!/usr/bin/env ruby
 require 'rubygems'
 require 'bundler/setup'
-require 'pry'
 require 'twitter'
 require 'mongo'
 require 'active_support/all'

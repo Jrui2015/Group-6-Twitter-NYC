@@ -6,6 +6,7 @@ This is a visualization class project which tries to visualize the realtime twit
 
 1. Mongodb running in the default 27017 port
 2. ruby gems:
+   - twitter
    - mongo
    - activesupport
 3. run `npm install` to install node dependencies
