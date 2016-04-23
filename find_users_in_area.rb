@@ -71,7 +71,7 @@ work = lambda do |obj|
   unless (obj.geo.nil? or obj.geo.coordinates.empty?)
     geo_count += 1
     id = obj.user.id
-    db[:users].update_one({ _id: id }, { updated_at: Time.now }, upsert: true)
+    db[:users].update_one({ _id: id }, { _id: id, updated_at: Time.now }, upsert: true)
   end
   puts "total: #{tweet_count}; retweet: #{retweet_count}; quote: #{quote_count}"
   puts "have_hashtags: #{hashtag_count}; have_geo: #{geo_count}"
