@@ -1,7 +1,5 @@
 /config
 node_modules
-log/
+*.log
 *.ids
-/nyc.log
-/tweets.log
 .idea
