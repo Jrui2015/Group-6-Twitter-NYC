@@ -27,8 +27,8 @@ class Twitter::Tweet
 end
 
 bounding_boxes = {
-  world: '-180,-90,180,90',
-  NYC: '-74,40,-73,41',
+  world: [ -180,-90,180,90 ],
+  NYC: [ -74,40,-73,41 ],
 }
 
 area = ARGV[0].to_sym if ARGV[0]
@@ -71,7 +71,11 @@ work = lambda do |obj|
   unless (obj.geo.nil? or obj.geo.coordinates.empty?)
     geo_count += 1
     id = obj.user.id
-    db[:users].update_one({ _id: id }, { _id: id, updated_at: Time.now }, upsert: true)
+    bounds = bounding_boxes[area]
+    y, x = obj.geo.coordinates
+    unless x < bounds[0] or y < bounds[1] or x > bounds[2] or y > bounds[3]
+      db[:users].update_one({ _id: id }, { _id: id, updated_at: Time.now }, upsert: true)
+    end
   end
   puts "total: #{tweet_count}; retweet: #{retweet_count}; quote: #{quote_count}"
   puts "have_hashtags: #{hashtag_count}; have_geo: #{geo_count}"
@@ -85,7 +89,7 @@ begin
   if area == :sample
     client.sample(&work)
   else
-    client.filter(locations: bounding_boxes[area], &work)
+    client.filter(locations: bounding_boxes[area].join(','), &work)
   end
 
 rescue Interrupt => err
