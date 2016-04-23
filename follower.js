@@ -1,15 +1,26 @@
-/* jshint esversion:6 */
-// TODO users_part starts from 0
-var users_part = 1; // TODO get from argv, remember add guards
+var users_part = 1;
 
-let MongoClient = require('mongodb').MongoClient;
-let url = require('./config/db').url;
-let apiConfig = require('./config/api-config');
-let assert = require('assert');
-let Stream = require('node-tweet-stream');
-// TODO followTokens[0] = require(...)
-let followToken = require(`./config/follow${users_part}`);
+var MongoClient = require('mongodb').MongoClient;
+var url = require('./config/db').url;
+var apiConfig = require('./config/api-config');
+var assert = require('assert');
+var Stream = require('node-tweet-stream');
+var followToken = require('./config/follow' + users_part);
 
+var app = require('express')();
+var http = require('http').Server(app);
+var io = require('socket.io')(http);
+
+app.get('/', function(req, res) {
+  res.sendFile(__dirname + '/index.html');
+});
+
+io.on('connection', function(socket) {
+  console.log('a user connected');
+  socket.on('disconnect', function() {
+    console.log('user disconnected');
+  });
+});
 
 // Setup stream
 var follower = new Stream({
@@ -20,33 +31,25 @@ var follower = new Stream({
 });
 
 var count = 0;
-follower.on('tweet', tweet => {
-  // transfer to client
-  // TODO use web socket
+follower.on('tweet', function(tweet) {
+  var brief = ++count + tweet.user.name + ': ' + tweet.text.substr(0,10) + '... ' +
+        '\u2937 ' + tweet.retweet_count + '\u2665 ' + tweet.favorite_count;
+
+  io.emit('tweet', tweet);
 
   // stdout
-  console.log(`${++count}: ` +
-              `${tweet.user.name}: ${tweet.text.substr(0,10)}... ` +
-              `(\u2937 ${tweet.retweet_count} \u2665 ${tweet.favorite_count})`);
+  console.log(brief);
 
-  MongoClient.connect(url, (err, db) => {
+  MongoClient.connect(url, function(err, db) {
     assert.equal(null, err);
-    db.collection('tweets').insert(tweet, () => db.close());
+    db.collection('tweets').insert(tweet, function() { db.close(); });
   });
-
 });
 
-
-follower.on('error', (err) => {
+follower.on('error', function(err) {
   console.log(err);
 });
 
-
-/**
- * get most recent active users, and only pass partial users
- * (of length STREAM_USER_FOLLOW_LIMIT) to process
- */
-// TODO add parameter user_part
 function getRecentActiveUsers(db, callback) {
   var cursor = db.collection('users').find({
     // TODO use easy-date package
@@ -60,31 +63,27 @@ function getRecentActiveUsers(db, callback) {
     .toArray(callback);
 }
 
-
 function fetchActiveUsersAndFollows() {
-
-  MongoClient.connect(url, (err, db) => {
+  MongoClient.connect(url, function(err, db) {
     assert.equal(null, err);
 
-    getRecentActiveUsers(db, (err, docs) => {
-      console.log(`totally ${docs.length} users`);
+    getRecentActiveUsers(db, function(err, docs) {
+      console.log('totally ' + docs.length + ' users');
 
-      var users = docs.map(d => d._id);
+      var users = docs.map(function(d) {return d._id;});
       db.close();
 
       follower._filters.follow = {};
       follower.follow(users);
     });
-
   });
 
-  // update active users periodically
-  setTimeout(fetchActiveUsersAndFollows, 2 * 60 * 1000);
-
+  setTimeout(fetchActiveUsersAndFollows, 2*60*1000);
 }
 
-
 // Let's start it
-// TODO start multiple (i.e. 2) follower lines
-// different reconnect time make data flow smoother
 fetchActiveUsersAndFollows();
+
+http.listen(80, function() {
+  console.log('listening on *:80');
+});
