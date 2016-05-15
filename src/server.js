@@ -22,6 +22,8 @@ import schema from './data/schema';
 import Router from './routes';
 import assets from './assets'; // eslint-disable-line import/no-unresolved
 import { port, auth, analytics } from './config';
+import http from 'http';
+import startTweetStream from './start-tweet-stream';
 
 const server = global.server = express();
 
@@ -129,7 +131,11 @@ server.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
 //
 // Launch the server
 // -----------------------------------------------------------------------------
-server.listen(port, () => {
+const httpServer = http.Server(server);
+
+httpServer.listen(port, () => {
   /* eslint-disable no-console */
   console.log(`The server is running at http://localhost:${port}/`);
 });
+
+startTweetStream(httpServer);
