@@ -25,7 +25,7 @@ function Home({ tweets }) {
 }
 
 Home.propTypes = {
-  tweets: PropTypes.array.isRequired,
+  tweets: PropTypes.array,
 };
 
 export default Home;

@@ -57,6 +57,8 @@ class App extends Component {
       const newState = this.state.tweets.concat(tweet);
       this.setState({ tweets: newState });
     };
+    global.setTweets = (tweets) => this.setState({ tweets });
+    global.getTweeets = () => this.state.tweets;
   }
 
   componentWillUnmount() {

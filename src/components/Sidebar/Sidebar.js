@@ -1,11 +1,16 @@
-import React from 'react';
+import TweetList from '../TweetList';
+import React, { PropTypes } from 'react';
 
-function Sidebar() {
+function Sidebar({ tweets }) {
   return (
 
-    <p>this is sidebar</p>
+    <TweetList tweets={tweets} />
 
   );
 }
+
+Sidebar.propTypes = {
+  tweets: PropTypes.array.isRequired,
+};
 
 export default Sidebar;

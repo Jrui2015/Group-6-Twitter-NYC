@@ -15,12 +15,19 @@ export default function startTweetStream(http) {
   io.on('connection', socket => {
     console.log('a user connected');
     socket.on('disconnect', () => console.log('user disconnected'));
+    Tweet.find({}, {}, {
+      sort: { created_at: -1 },
+      limit: 100,
+    }, (err, docs) => {
+      if (err) throw err;
+      io.emit('tweets', docs.map(d => d.tweet));
+    });
   });
 
   const follower = new Stream({ consumer_key, consumer_secret, token, token_secret });
   follower.on('tweet', tweet => {
     if (!tweet.coordinates) return;
-    console.log(`${tweet.user.name}: ${tweet.text.substr(0,10)}...`);
+    console.log(`${tweet.user.name}: ${tweet.text.substr(0, 10)}...`);
     io.emit('tweet', tweet);
     new Tweet({ tweet }).save((err) => {
       if (err) throw err;
