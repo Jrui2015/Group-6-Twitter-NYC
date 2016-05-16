@@ -1,12 +1,16 @@
-import React from 'react';
+import React, { PropTypes } from 'react';
 import TweetMap from '../Map';
 
-function Main() {
+function Main({ tweets }) {
   return (
 
-    <TweetMap />
+    <TweetMap tweets={tweets} />
 
   );
 }
+
+Main.propTypes = {
+  tweets: PropTypes.array.isRequired,
+};
 
 export default Main;

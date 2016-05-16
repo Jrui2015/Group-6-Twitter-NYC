@@ -33,6 +33,13 @@ class App extends Component {
     onPageNotFound: PropTypes.func.isRequired,
   };
 
+  constructor(props) {
+    super(props);
+    this.state = {
+      tweets: [],
+    };
+  }
+
   getChildContext() {
     const context = this.props.context;
     return {
@@ -46,6 +53,10 @@ class App extends Component {
   componentWillMount() {
     const { insertCss } = this.props.context;
     this.removeCss = insertCss(s);
+    global.addTweet = (tweet) => {
+      const newState = this.state.tweets.concat(tweet);
+      this.setState({ tweets: newState });
+    };
   }
 
   componentWillUnmount() {
@@ -53,10 +64,14 @@ class App extends Component {
   }
 
   render() {
+    const childrenWithProps = React.Children.map(this.props.children,
+                                                 child =>
+                                                 React.cloneElement(child, this.state)
+                                                );
     return !this.props.error ? (
       <div className="App_fill_2Je">
         <Header />
-        {this.props.children}
+        {childrenWithProps}
         <Footer />
       </div>
     ) : this.props.children;
