@@ -17,7 +17,7 @@ export default function startTweetStream(http) {
     socket.on('disconnect', () => console.log('user disconnected'));
     Tweet.find({}, {}, {
       sort: { created_at: -1 },
-      limit: 100,
+      limit: 1000,
     }, (err, docs) => {
       if (err) throw err;
       io.emit('tweets', docs.map(d => d.tweet));

@@ -4,37 +4,46 @@ import d3 from 'd3';
 
 const NYC = [40.7317, -73.9841];
 
-const mercatorXofLongitude = (lon) => lon * 20037508.34 / 180;
-const mercatorYofLatitude = (lat) =>
-        (Math.log(Math.tan((90 + lat) * Math.PI / 360)) /
-         (Math.PI / 180)) * 20037508.34 / 180;
+const MIN_RADIUS = 3;
+const radiusScale = d3.scale.sqrt();
 
-function updateNodes(quadtree) {
-  /* eslint-disable no-param-reassign */
-  const nodes = [];
-  quadtree.depth = 0;
+/* eslint-disable no-param-reassign */
 
-  quadtree.visit((node, x1, y1, x2, y2) => {
-    const nodeRect = {
-      left: mercatorXofLongitude(x1),
-      right: mercatorXofLongitude(x2),
-      bottom: mercatorYofLatitude(y1),
-      top: mercatorYofLatitude(y2),
-    };
-    node.width = (nodeRect.right - nodeRect.left);
-    node.height = (nodeRect.top - nodeRect.bottom);
-
-    if (node.depth === 0) {
-      console.log(`width: ${node.width} height: ${node.height}`);
-    }
-    nodes.push(node);
-    for (let i = 0; i < 4; i++) {
-      if (node.nodes[i]) node.nodes[i].depth = node.depth + 1;
-    }
-  });
-  return nodes;
+function bottomUp(node, base, recursive) {
+  let ret;
+  if (node.leaf) {
+    ret = base(node);
+  } else {
+    const nodes = node.nodes.filter(e => e);
+    ret = recursive(node, nodes);
+  }
+  return ret;
 }
 
+const computeSize = node => bottomUp(node, (nd) => {
+  nd.size = 1;
+  return 1;
+}, (nd, nodes) => {
+  nd.size = nodes
+    .map(n => computeSize(n))
+    .reduce((a, b) => a + b);
+  return nd.size;
+});
+
+const computeCentroids = node => bottomUp(node, (nd) => {
+  nd.cx = nd.x;
+  nd.cy = nd.y;
+  return [{ pos: nd.cx, size: 1 }, { pos: nd.cy, size: 1 }];
+}, (nd, nodes) => {
+  const centroids = nodes.map(n => computeCentroids(n));
+  const sum = (a, b) => ({
+    pos: (a.pos * a.size + b.pos * b.size) / (a.size + b.size),
+    size: a.size + b.size,
+  });
+  nd.cx = centroids.map(n => n[0]).reduce(sum, { pos: 0, size: 0 }).pos;
+  nd.cy = centroids.map(n => n[1]).reduce(sum, { pos: 0, size: 0 }).pos;
+  return [{ pos: nd.cx, size: nd.size }, { pos: nd.cy, size: nd.size }];
+});
 
 const cscale = d3
         .scale
@@ -46,15 +55,6 @@ const cscale = d3
           '#00ffff', '#0094ff',
         ]);
 
-
-function getZoomScale(leafletMap) {
-  const mapWidth = leafletMap.getSize().x;
-  const bounds = leafletMap.getBounds();
-  const planarWidth = mercatorXofLongitude(bounds.getEast()) -
-          mercatorXofLongitude(bounds.getWest());
-  const zoomScale = mapWidth / planarWidth;
-  return zoomScale;
-}
 
 class TweetMap extends Component {
 
@@ -82,6 +82,7 @@ class TweetMap extends Component {
       .attr('class', 'leaflet-zoom-hide tweet-locations');
 
     const _map = this.map;
+    global.map = this.map
     function projectPoint(x, y) {
       const point = _map.latLngToLayerPoint(new L.LatLng(y, x));
       this.stream.point(point.x, point.y);
@@ -95,49 +96,53 @@ class TweetMap extends Component {
     this.setState({ bounds: this.map.getBounds() });
   }
 
+
   search(quadtree, x0, y0, x3, y3) {
     const pts = [];
-    let subPixel = false;
-    let subPts = [];
-    const scale = getZoomScale(this.map);
-    let counter = 0;
     quadtree.visit((node, x1, y1, x2, y2) => {
-      const p = node.point;
-      const pwidth = node.width * scale;
-      const pheight = node.height * scale;
-      // -- if this is too small rectangle only count the branch and set opacity
-      if ((pwidth * pheight) <= 1) {
-        // start collecting sub Pixel points
-        subPixel = true;
-      } else { // -- jumped to super node large than 1 pixel
-        // end collecting sub Pixel points
-        if (subPixel && subPts && subPts.length > 0) {
-          subPts[0].group = subPts.length;
-          pts.push(subPts[0]); // add only one todo calculate intensity
-          counter += subPts.length - 1;
-          subPts = [];
-        }
-        subPixel = false;
-      }
-      if ((p) && (p.x >= x0) && (p.x < x3) && (p.y >= y0) && (p.y < y3)) {
-        if (subPixel) {
-          subPts.push(p.all);
-        } else {
-          if (p.all.group) {
-            delete (p.all.group);
-          }
-          pts.push(p.all);
-        }
+      const pt = node.point;
+      if (pt && pt.x >= x0 && pt.x < x3 && pt.y >= y0 && pt.y < y3) {
+        pts.push(pt.all);
       }
       return x1 >= x3 || y1 >= y3 || x2 < x0 || y2 < y0;
     });
     return pts;
   }
 
+  makeClusters(quadtree) {
+    const clusters = [];
+    computeSize(quadtree);
+    computeCentroids(quadtree);
+    const size = this.map.getSize();
+    const maxRadius = Math.min(size.x, size.y) / 15;
+    this.rscale = radiusScale
+            .domain([1, quadtree.size])
+            .range([MIN_RADIUS, maxRadius]);
+    let id = 0;
+    quadtree.visit((node) => {
+      node.id = id++;
+    });
+    quadtree.visit((node, x1, y1, x2, y2) => {
+      const radius = this.rscale(node.size);
+      const bound = Math.min(x2 - x1, y2 - y1) * 0.2;
+      if (bound <= radius) {
+        clusters.push(node);
+        return true;
+      }
+      if (node.leaf) {
+        clusters.push(node);
+      }
+      return false;
+    });
+    global.data = quadtree
+    global.cluster = clusters
+    return clusters;
+  }
+
+
   redrawSubset(subset) {
-    this.path.pointRadius(3);// * scale);
     const bounds = this.path.bounds({ type: 'FeatureCollection', features: subset });
-    const padding = 30;
+    const padding = 100;
     const topLeft = bounds[0].map(x => x - padding);
     const bottomRight = bounds[1].map(x => x + padding);
 
@@ -148,11 +153,28 @@ class TweetMap extends Component {
 
     this.g.attr('transform', `translate(${-topLeft[0]}, ${-topLeft[1]})`);
 
-    const points = this.g.selectAll('path')
-          .data(subset, d => d.id_str);
-    points.enter().append('path').style('fill', '#ffd800');
+    const projected = subset.map(feature => ({
+      id_str: feature.id_str,
+      text: feature.text,
+      name: feature.name,
+      x: this.path.centroid(feature)[0],
+      y: this.path.centroid(feature)[1],
+    }));
+    const groups = d3.geom.quadtree(projected);
+    const clusters = this.makeClusters(groups);
+    // TODO use clusters
+    const points = this.g.selectAll('circle')
+          .data(clusters, d => d.id);
+    points.enter().append('circle').style({
+      fill: '#ffd800',
+      opacity: 0.6,
+    });
     points.exit().remove();
-    points.attr('d', this.path);
+    points.attr({
+      cx: d => d.cx,
+      cy: d => d.cy,
+      r: d => this.rscale(d.size),
+    });
 
     points.style('fill-opacity', d => d.group ? (d.group * 0.1) + 0.2 : 1);
   }
@@ -164,12 +186,13 @@ class TweetMap extends Component {
       y: tweet.coordinates.coordinates[1],
       all: {
         id_str: tweet.id_str,
+        text: tweet.text,
+        name: tweet.user.name,
         type: 'Feature',
         geometry: tweet.coordinates,
       },
     }));
     this.qtree = d3.geom.quadtree(points);
-    updateNodes(this.qtree);
     global.qtree = this.qtree
     const bounds = this.state.bounds;
     if (bounds) {
