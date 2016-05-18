@@ -12,6 +12,6 @@ import Home from './Home';
 
 export const path = '/';
 export const action = async (state) => {
-  state.context.onSetTitle('React.js Starter Kit');
+  state.context.onSetTitle('Twitter NYC');
   return <Home />;
 };

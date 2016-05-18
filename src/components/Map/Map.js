@@ -1,6 +1,15 @@
 import React, { Component, PropTypes } from 'react';
 import L from 'leaflet-headless';
 import d3 from 'd3';
+import { Corpus, Terms, STOPWORDS } from 'text-miner';
+import Cloud from '../Cloud';
+
+// XXX do some evil here
+let counter = 0;
+function addCounter() {
+  counter = (++counter) % 10;
+  return counter;
+}
 
 const NYC = [40.7317, -73.9841];
 
@@ -11,7 +20,7 @@ const radiusScale = d3.scale.sqrt();
 
 function bottomUp(node, base, recursive) {
   let ret;
-  if (node.leaf) {
+  if (node.leaf && node.point) {
     ret = base(node);
   } else {
     const nodes = node.nodes.filter(e => e);
@@ -26,7 +35,7 @@ const computeSize = node => bottomUp(node, (nd) => {
 }, (nd, nodes) => {
   nd.size = nodes
     .map(n => computeSize(n))
-    .reduce((a, b) => a + b);
+    .reduce((a, b) => a + b, 0);
   return nd.size;
 });
 
@@ -45,16 +54,30 @@ const computeCentroids = node => bottomUp(node, (nd) => {
   return [{ pos: nd.cx, size: nd.size }, { pos: nd.cy, size: nd.size }];
 });
 
-const cscale = d3
-        .scale
-        .linear()
-        .domain([1, 3])
-        .range([
-          '#ff0000', '#ff6a00',
-          '#ffd800', '#b6ff00',
-          '#00ffff', '#0094ff',
-        ]);
+function visit(node, cb) {
+  cb(node);
+  node.nodes.filter(e => e).forEach(e => visit(e, cb));
+}
 
+function countKeywords(clusters) {
+  clusters.filter(n => n.size > 5).forEach(node => {
+    let doc = '';
+    visit(node, n => {
+      if (n.point) {
+        doc += ` ${n.point.text}`;
+      }
+    });
+    const corpus = new Corpus([doc]);
+    corpus
+      .trim()
+      .toLower()
+      .removeInterpunctuation()
+      .removeNewlines()
+      .removeWords(STOPWORDS.EN)
+      .removeWords(['#']);
+    node.dict = new Terms(corpus).findFreqTerms(10);
+  });
+}
 
 class TweetMap extends Component {
 
@@ -82,7 +105,6 @@ class TweetMap extends Component {
       .attr('class', 'leaflet-zoom-hide tweet-locations');
 
     const _map = this.map;
-    global.map = this.map
     function projectPoint(x, y) {
       const point = _map.latLngToLayerPoint(new L.LatLng(y, x));
       this.stream.point(point.x, point.y);
@@ -113,6 +135,11 @@ class TweetMap extends Component {
     const clusters = [];
     computeSize(quadtree);
     computeCentroids(quadtree);
+    if (addCounter() === 2) {
+      countKeywords([quadtree]);
+      this.dict = quadtree.dict;
+      global.dict = quadtree.dict;
+    }
     const size = this.map.getSize();
     const maxRadius = Math.min(size.x, size.y) / 15;
     this.rscale = radiusScale
@@ -134,8 +161,9 @@ class TweetMap extends Component {
       }
       return false;
     });
-    global.data = quadtree
-    global.cluster = clusters
+    countKeywords(clusters);
+    global.clusters = clusters
+    //global.data = quadtree
     return clusters;
   }
 
@@ -162,7 +190,7 @@ class TweetMap extends Component {
     }));
     const groups = d3.geom.quadtree(projected);
     const clusters = this.makeClusters(groups);
-    // TODO use clusters
+
     const points = this.g.selectAll('circle')
           .data(clusters, d => d.id);
     points.enter().append('circle').style({
@@ -175,8 +203,6 @@ class TweetMap extends Component {
       cy: d => d.cy,
       r: d => this.rscale(d.size),
     });
-
-    points.style('fill-opacity', d => d.group ? (d.group * 0.1) + 0.2 : 1);
   }
 
 
@@ -193,7 +219,7 @@ class TweetMap extends Component {
       },
     }));
     this.qtree = d3.geom.quadtree(points);
-    global.qtree = this.qtree
+    //global.qtree = this.qtree
     const bounds = this.state.bounds;
     if (bounds) {
       const subset = this.search(this.qtree,
@@ -204,7 +230,8 @@ class TweetMap extends Component {
       this.redrawSubset(subset);
     }
     return (
-      <div id="map" style={{ minHeight: '200px' }} className="App_fill_2Je">
+      <div className="App_fill_2Je">
+        <div id="map" style={{ minHeight: '200px' }} className="App_fill_2Je"></div>
       </div>
     );
   }

@@ -5,6 +5,7 @@
     "npm": ">=3.3 <4"
   },
   "dependencies": {
+    "WNdb": "^3.1.2",
     "babel-polyfill": "6.6.1",
     "babel-runtime": "6.6.1",
     "bluebird": "3.3.3",
@@ -12,6 +13,7 @@
     "classnames": "2.2.3",
     "cookie-parser": "1.4.1",
     "d3": "^3.5.17",
+    "d3-cloud": "^1.2.1",
     "eslint": "^2.3.0",
     "eventemitter3": "1.1.1",
     "express": "4.13.4",
@@ -26,6 +28,7 @@
     "isomorphic-style-loader": "0.0.12",
     "jade": "1.11.0",
     "jsonwebtoken": "5.7.0",
+    "lapack": "^0.1.0",
     "leaflet": "^0.7.7",
     "leaflet-headless": "^0.1.1",
     "markdown-it": "6.0.0",
@@ -43,6 +46,7 @@
     "react-routing": "0.0.7",
     "socket.io": "^1.4.6",
     "source-map-support": "0.4.0",
+    "text-miner": "^1.0.5",
     "whatwg-fetch": "0.11.0"
   },
   "devDependencies": {

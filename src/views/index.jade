@@ -3,12 +3,13 @@ html
   head
     meta(charset="utf-8")
     meta(http-equiv="x-ua-compatible", content="ie=edge")
-    title= title
+    title= "Twitter NYC"
     meta(name="description", description=description)
     meta(name="viewport", content="width=device-width, initial-scale=1")
     link(rel="stylesheet", href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/leaflet.css")
     link(rel="apple-touch-icon", href="apple-touch-icon.png")
     link(rel="stylesheet", href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css")
+    link(rel="stylesheet", href="https://platform.twitter.com/css/tweet.471570ba88c78e0ee58bb8c868da909d.light.ltr.css")
     style#css!= css
   body
     #app.App_fill_2Je!= body
@@ -16,6 +17,14 @@ html
     script(src="https://code.jquery.com/jquery-2.2.3.min.js")
     script(src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js")
     script(src="/socket.io/socket.io.js")
+    script(src="/d3.layout.cloud.js")
+    script(src="/client.js")
+    script.
+      $(() => {
+        var height = $('#map').height();
+        $('#tweet-list').css('height', height + 'px')
+        $('#tweet-list').css('overflow', 'scroll')
+      })
     script.
       $(() => {
         var socket = io();
