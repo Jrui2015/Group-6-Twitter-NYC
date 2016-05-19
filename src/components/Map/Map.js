@@ -1,6 +1,8 @@
 import React, { Component, PropTypes } from 'react';
 import L from 'leaflet-headless';
 import d3 from 'd3';
+import QuadTree from './quadtree';
+global.QuadTree = QuadTree
 
 const NYC = [40.7317, -73.9841];
 
@@ -140,8 +142,11 @@ class TweetMap extends Component {
   }
 
 
-  redrawSubset(subset) {
-    const bounds = this.path.bounds({ type: 'FeatureCollection', features: subset });
+  redrawSubset(nodes) {
+    global.nodes = nodes
+    const features = [].concat(...nodes.map(d => d.geo));
+    global.features = features
+    const bounds = this.path.bounds({ type: 'FeatureCollection', features });
     const padding = 100;
     const topLeft = bounds[0].map(x => x - padding);
     const bottomRight = bounds[1].map(x => x + padding);
@@ -153,6 +158,7 @@ class TweetMap extends Component {
 
     this.g.attr('transform', `translate(${-topLeft[0]}, ${-topLeft[1]})`);
 
+    /*
     const projected = subset.map(feature => ({
       id_str: feature.id_str,
       text: feature.text,
@@ -177,6 +183,41 @@ class TweetMap extends Component {
     });
 
     points.style('fill-opacity', d => d.group ? (d.group * 0.1) + 0.2 : 1);
+    */
+    const projected = nodes.map(nd => ({
+      topLeft: this.path.centroid(nd.geo[0]),
+      bottomRight: this.path.centroid(nd.geo[1]),
+      id: nd.id,
+      node: nd.node,
+    }));
+    projected.forEach(d => {
+      d.width = d.bottomRight[0] - d.topLeft[0];
+      d.height = d.bottomRight[1] - d.topLeft[1];
+    });
+
+    const rects = this.g.selectAll('rect').data(projected, d => d.id);
+    rects.enter().append('rect');
+    rects.exit().remove();
+    rects.attr({
+      x: nd => nd.topLeft[0],
+      y: nd => nd.topLeft[1],
+      width: nd => nd.width,
+      height: nd => nd.height,
+    }).style({
+      stroke: 'blue',
+      fill: 'none',
+    });
+
+    const sizes = this.g.selectAll('text').data(projected, d => d.id);
+    sizes.enter().append('text').text(d => d.node.size);
+    sizes.exit().remove();
+    sizes.attr({
+      x: d => d.topLeft[0] + d.width / 2,
+      y: d => d.topLeft[1] + d.height / 2,
+    }).style({
+      'text-anchor': 'center',
+      fill: 'yellow',
+    });
   }
 
 
@@ -192,17 +233,29 @@ class TweetMap extends Component {
         geometry: tweet.coordinates,
       },
     }));
-    this.qtree = d3.geom.quadtree(points);
+    //this.qtree = d3.geom.quadtree(points);
+    this.qtree = new QuadTree([-180, -90, 180, 90], points);
     global.qtree = this.qtree
+    global.point = points[0]
+    global.path = this.path
+
     const bounds = this.state.bounds;
     if (bounds) {
-      const subset = this.search(this.qtree,
-                                 bounds.getWest(),
-                                 bounds.getSouth(),
-                                 bounds.getEast(),
-                                 bounds.getNorth());
-      this.redrawSubset(subset);
+      let nodes = this.qtree.nodesInBounds([bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()], 0.0000000001);
+      nodes = nodes.map(nd => ({
+        geo: [{
+          type: 'Feature',
+          geometry: { coordinates: [nd.l, nd.b], type: 'Point' },
+        }, {
+          type: 'Feature',
+          geometry: { coordinates: [nd.r, nd.t], type: 'Point' },
+        }],
+        id: nd.id,
+        node: nd,
+      }));
+      this.redrawSubset(nodes);
     }
+
     return (
       <div id="map" style={{ minHeight: '200px' }} className="App_fill_2Je">
       </div>

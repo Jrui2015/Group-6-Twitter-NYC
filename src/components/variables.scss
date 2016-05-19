@@ -35,3 +35,12 @@ $screen-lg-min:         1200px; /* Large screen / wide desktop */
  * ========================================================================== */
 
 $animation-swift-out:   .45s cubic-bezier(0.3, 1, 0.4, 1) 0s;
+
+.fill {
+  height: 100%;
+  min-height: 100%;
+}
+
+.main {
+  height: 90%;
+}

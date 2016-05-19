@@ -12,6 +12,8 @@ import emptyFunction from 'fbjs/lib/emptyFunction';
 import s from './App.scss';
 import Header from '../Header';
 import Footer from '../Footer';
+import Sidebar from '../Sidebar';
+import Main from '../Main';
 
 class App extends Component {
 
@@ -20,9 +22,7 @@ class App extends Component {
       insertCss: PropTypes.func,
       onSetTitle: PropTypes.func,
       onSetMeta: PropTypes.func,
-      onPageNotFound: PropTypes.func,
     }),
-    children: PropTypes.element.isRequired,
     error: PropTypes.object,
   };
 
@@ -30,7 +30,6 @@ class App extends Component {
     insertCss: PropTypes.func.isRequired,
     onSetTitle: PropTypes.func.isRequired,
     onSetMeta: PropTypes.func.isRequired,
-    onPageNotFound: PropTypes.func.isRequired,
   };
 
   constructor(props) {
@@ -46,7 +45,6 @@ class App extends Component {
       insertCss: context.insertCss || emptyFunction,
       onSetTitle: context.onSetTitle || emptyFunction,
       onSetMeta: context.onSetMeta || emptyFunction,
-      onPageNotFound: context.onPageNotFound || emptyFunction,
     };
   }
 
@@ -66,17 +64,21 @@ class App extends Component {
   }
 
   render() {
-    const childrenWithProps = React.Children.map(this.props.children,
-                                                 child =>
-                                                 React.cloneElement(child, this.state)
-                                                );
-    return !this.props.error ? (
-      <div className="App_fill_2Je">
+    this.props.context.onSetTitle('Twitter NYC');
+    return (
+      <div className={s.fill}>
         <Header />
-        {childrenWithProps}
+        <div className={s.main}>
+          <div className={`col-md-3 ${s.fill}`}>
+            <Sidebar tweets={this.state.tweets} />
+          </div>
+          <div className={`col-md-9 ${s.fill}`}>
+            <Main tweets={this.state.tweets} />
+          </div>
+        </div>
         <Footer />
       </div>
-    ) : this.props.children;
+    );
   }
 
 }
