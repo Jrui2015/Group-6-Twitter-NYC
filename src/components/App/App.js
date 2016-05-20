@@ -14,6 +14,7 @@ import Header from '../Header';
 import Footer from '../Footer';
 import Sidebar from '../Sidebar';
 import Main from '../Main';
+import QuadTree from '../Map/QuadTree';
 
 class App extends Component {
 
@@ -36,6 +37,8 @@ class App extends Component {
     super(props);
     this.state = {
       tweets: [],
+      nodesInBounds: [],
+      qtrees: {},
     };
   }
 
@@ -52,19 +55,42 @@ class App extends Component {
     const { insertCss } = this.props.context;
     this.removeCss = insertCss(s);
     global.addTweet = (tweet) => {
+      this.state.qtrees[this.state.timeWindow].insert({
+        x: tweet.coordinates.coordinates[0],
+        y: tweet.coordinates.coordinates[1],
+        all: tweet,
+      });
       const newState = this.state.tweets.concat(tweet);
-      this.setState({ tweets: newState });
+      const nodesInBounds = this.state.qtrees[this.state.timeWindow]
+              .nodesInBounds(this.state.bounds);
+      this.setState({ tweets: newState, newTweetLocation: tweet.coordinates, nodesInBounds });
     };
-    global.setTweets = (tweets) => this.setState({ tweets });
-    global.getTweeets = () => this.state.tweets;
+    global.setTweets = (tweets, timeWindow) => {
+      this.state.qtrees[timeWindow] = new QuadTree([-180, -90, 180, 90], tweets.map(t => ({
+        x: t.coordinates.coordinates[0],
+        y: t.coordinates.coordinates[1],
+        all: t,
+      })));
+      const nodesInBounds = this.state.qtrees[timeWindow]
+              .nodesInBounds(this.state.bounds);
+      this.setState({ tweets, timeWindow, nodesInBounds });
+    };
   }
 
   componentWillUnmount() {
     this.removeCss();
   }
 
+  onBoundsChange(bounds) {
+    this.setState({ bounds });
+    if (!this.state || !this.state.qtrees[this.state.timeWindow]) return;
+    const nodesInBounds = this.state.qtrees[this.state.timeWindow].nodesInBounds(bounds);
+    this.setState({ nodesInBounds });
+  }
+
   render() {
     this.props.context.onSetTitle('Twitter NYC');
+    const onBoundsChange = this.onBoundsChange.bind(this);
     return (
       <div className={s.fill}>
         <Header />
@@ -73,7 +99,12 @@ class App extends Component {
             <Sidebar tweets={this.state.tweets} />
           </div>
           <div className={`col-md-9 ${s.fill}`}>
-            <Main tweets={this.state.tweets} />
+            <Main
+              tweets={this.state.tweets}
+              nodesInBounds={this.state.nodesInBounds}
+              newTweetLocation={this.state.newTweetLocation}
+              onBoundsChange={onBoundsChange}
+            />
           </div>
         </div>
         <Footer />

@@ -6,6 +6,8 @@ import Stream from 'node-tweet-stream';
 import socketIo from 'socket.io';
 import Tweet from './models/Tweet';
 
+const DEF_TIME_WINDOW = 60;
+
 mongoose.connect(url, (err) =>
                  err ? console.error(err) : console.log('database connected...'));
 
@@ -17,10 +19,10 @@ export default function startTweetStream(http) {
     socket.on('disconnect', () => console.log('user disconnected'));
     Tweet.find({}, {}, {
       sort: { created_at: -1 },
-      limit: 1000,
+      limit: 1000, // TODO find the latest in timeWindow min
     }, (err, docs) => {
       if (err) throw err;
-      io.emit('tweets', docs.map(d => d.tweet));
+      io.emit('tweets', [DEF_TIME_WINDOW, docs.map(d => d.tweet)]);
     });
   });
 

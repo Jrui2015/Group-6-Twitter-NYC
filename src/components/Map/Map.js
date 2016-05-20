@@ -22,46 +22,13 @@ function bottomUp(node, base, recursive) {
   return ret;
 }
 
-const computeSize = node => bottomUp(node, (nd) => {
-  nd.size = 1;
-  return 1;
-}, (nd, nodes) => {
-  nd.size = nodes
-    .map(n => computeSize(n))
-    .reduce((a, b) => a + b);
-  return nd.size;
-});
-
-const computeCentroids = node => bottomUp(node, (nd) => {
-  nd.cx = nd.x;
-  nd.cy = nd.y;
-  return [{ pos: nd.cx, size: 1 }, { pos: nd.cy, size: 1 }];
-}, (nd, nodes) => {
-  const centroids = nodes.map(n => computeCentroids(n));
-  const sum = (a, b) => ({
-    pos: (a.pos * a.size + b.pos * b.size) / (a.size + b.size),
-    size: a.size + b.size,
-  });
-  nd.cx = centroids.map(n => n[0]).reduce(sum, { pos: 0, size: 0 }).pos;
-  nd.cy = centroids.map(n => n[1]).reduce(sum, { pos: 0, size: 0 }).pos;
-  return [{ pos: nd.cx, size: nd.size }, { pos: nd.cy, size: nd.size }];
-});
-
-const cscale = d3
-        .scale
-        .linear()
-        .domain([1, 3])
-        .range([
-          '#ff0000', '#ff6a00',
-          '#ffd800', '#b6ff00',
-          '#00ffff', '#0094ff',
-        ]);
-
-
 class TweetMap extends Component {
 
   static propTypes = {
     tweets: PropTypes.array.isRequired,
+    newTweetLocation: PropTypes.object,
+    nodesInBounds: PropTypes.array,
+    onBoundsChange: PropTypes.func.isRequired,
   };
 
   constructor(props) {
@@ -84,7 +51,6 @@ class TweetMap extends Component {
       .attr('class', 'leaflet-zoom-hide tweet-locations');
 
     const _map = this.map;
-    global.map = this.map
     function projectPoint(x, y) {
       const point = _map.latLngToLayerPoint(new L.LatLng(y, x));
       this.stream.point(point.x, point.y);
@@ -95,26 +61,15 @@ class TweetMap extends Component {
   }
 
   _updateBounds() {
-    this.setState({ bounds: this.map.getBounds() });
-  }
-
-
-  search(quadtree, x0, y0, x3, y3) {
-    const pts = [];
-    quadtree.visit((node, x1, y1, x2, y2) => {
-      const pt = node.point;
-      if (pt && pt.x >= x0 && pt.x < x3 && pt.y >= y0 && pt.y < y3) {
-        pts.push(pt.all);
-      }
-      return x1 >= x3 || y1 >= y3 || x2 < x0 || y2 < y0;
-    });
-    return pts;
+    const bounds = this.map.getBounds();
+    this.props.onBoundsChange([bounds.getWest(),
+                               bounds.getSouth(),
+                               bounds.getEast(),
+                               bounds.getNorth()]);
   }
 
   makeClusters(quadtree) {
     const clusters = [];
-    computeSize(quadtree);
-    computeCentroids(quadtree);
     const size = this.map.getSize();
     const maxRadius = Math.min(size.x, size.y) / 15;
     this.rscale = radiusScale
@@ -136,26 +91,22 @@ class TweetMap extends Component {
       }
       return false;
     });
-    global.data = quadtree
-    global.cluster = clusters
     return clusters;
   }
 
 
   redrawSubset(nodes) {
-    global.nodes = nodes
+    if (!nodes.length) return;
     const features = [].concat(...nodes.map(d => d.geo));
-    global.features = features
+
     const bounds = this.path.bounds({ type: 'FeatureCollection', features });
     const padding = 100;
     const topLeft = bounds[0].map(x => x - padding);
     const bottomRight = bounds[1].map(x => x + padding);
-
     this.svg.attr('width', bottomRight[0] - topLeft[0])
       .attr('height', bottomRight[1] - topLeft[1])
       .style('left', `${topLeft[0]}px`)
       .style('top', `${topLeft[1]}px`);
-
     this.g.attr('transform', `translate(${-topLeft[0]}, ${-topLeft[1]})`);
 
     /*
@@ -229,28 +180,9 @@ class TweetMap extends Component {
 
 
   render() {
-    const points = this.props.tweets.map((tweet) => ({
-      x: tweet.coordinates.coordinates[0],
-      y: tweet.coordinates.coordinates[1],
-      all: {
-        id_str: tweet.id_str,
-        text: tweet.text,
-        name: tweet.user.name,
-        type: 'Feature',
-        geometry: tweet.coordinates,
-      },
-    }));
-    //this.qtree = d3.geom.quadtree(points);
-    this.qtree = new QuadTree([-180, -90, 180, 90], points);
-    global.qtree = this.qtree
-    global.point = points[0]
-    global.path = this.path
-
-    const bounds = this.state.bounds;
-    if (bounds) {
-      const minWidth = (bounds.getEast() - bounds.getWest()) >> 10;
-      let nodes = this.qtree.nodesInBounds([bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()], minWidth);
-      nodes = nodes.map(nd => ({
+    const nodes = this.props.nodesInBounds;
+    if (nodes) {
+      const rects = nodes.map(nd => ({
         geo: [{
           type: 'Feature',
           geometry: { coordinates: [nd.l, nd.b], type: 'Point' },
@@ -261,7 +193,7 @@ class TweetMap extends Component {
         id: nd.id,
         node: nd,
       }));
-      this.redrawSubset(nodes);
+      this.redrawSubset(rects);
     }
 
     return (

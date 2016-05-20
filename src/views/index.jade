@@ -19,6 +19,6 @@ html
     script.
       $(() => {
         var socket = io();
-        socket.on('tweets', tweets => setTweets(tweets));
+        socket.on('tweets', ([timeWindow, tweets]) => setTweets(tweets, timeWindow));
         socket.on('tweet', tweet => addTweet(tweet));
       })
