@@ -122,10 +122,13 @@ class Node {
     if (!stop) { this.nodes.filter(e => e).forEach(e => e.visit(callback, followNext)); }
   }
 
-  nodesInBounds(bounds, minWidth) {
+  nodesInBounds(bounds) {
+    if (!bounds || bounds.map(d => isNaN(d)).reduce((a, b) => a || b)) { return []; }
     const nodes = [];
     const [bl, bt, br, bb] = bounds;
+    const minWidth = (br - bl) >> 10;
     this.visit((nd, _, l, t, r, b) => {
+      // full rect included in the area
       if (l - bl > minWidth &&
           t - bt > minWidth &&
           br - r > minWidth &&
@@ -137,6 +140,7 @@ class Node {
     }, false);
     // fallback to bigger scope
     if (!nodes.length) {
+      // intersect with the area
       this.visit((nd, _, l, t, r, b) => {
         if ((bl <= l && l <= br) ||
             (bl <= r && r <= br) ||
@@ -167,7 +171,7 @@ export default class QuadTree {
     return this.root.insert(item);
   }
 
-  nodesInBounds(bounds, minWidth) {
-    return this.root.nodesInBounds(bounds, minWidth);
+  nodesInBounds(bounds) {
+    return this.root.nodesInBounds(bounds);
   }
 }
