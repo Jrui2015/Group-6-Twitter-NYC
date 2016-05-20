@@ -2,7 +2,7 @@
 class Node {
   static id = 0;
 
-  constructor(bounds, data = null, root = false) {
+  constructor(bounds, data = null, root = false, callback = null) {
     [this.l, this.t, this.r, this.b] = bounds.map(e => +e);
     this.w = this.r - this.l;
     this.h = this.b - this.t;
@@ -14,6 +14,9 @@ class Node {
     this.id = Node.id++;
     this.size = data ? 1 : 0;
     this.centroid = data ? [this.data.x, this.data.y] : [0, 0];
+
+    this.callback = callback;
+    if (callback) console.log(callback)
   }
 
   find(item, cb) {
@@ -62,6 +65,7 @@ class Node {
     if (this.isLeaf && !this.data) {
       this.data = item;
       this.size++;
+      if (this.callback) this.callback(this, item);
       this.centroid = [item.x, item.y];
       return this;
     }
@@ -69,6 +73,7 @@ class Node {
     // case: link identical items to avoid infinite loop
     // case: link items in a very small area (i.e. a point)
     const leaf = this.find(item, nd => {
+      if (this.callback) this.callback(nd, item);
       nd.centroid = [
         (nd.centroid[0] * nd.size + item.x) / (nd.size + 1),
         (nd.centroid[1] * nd.size + item.y) / (nd.size + 1),
@@ -103,6 +108,10 @@ class Node {
         node = node.split(index);
         node.size += 2;
         node.centroid = [(item.x + item2.x) / 2, (item.y + item2.y) / 2];
+        if (this.callback) {
+          this.callback(node, item);
+          this.callback(node, item2);
+        }
       }
     } while (index === index2);
 
@@ -162,8 +171,9 @@ class Node {
 
 
 export default class QuadTree {
-  constructor(bounds, nodes = []) {
-    this.root = new Node(bounds, null, true);
+  // callback(node, item)
+  constructor(bounds, nodes = [], callback = null) {
+    this.root = new Node(bounds, null, true, callback);
     nodes.forEach(e => this.root.insert(e));
   }
 

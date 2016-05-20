@@ -1,13 +1,14 @@
 import React, { PropTypes } from 'react';
 import TweetMap from '../Map';
 
-function Main({ tweets, newTweetLocation, nodesInBounds, onBoundsChange }) {
+function Main({ tweets, newTweetLocation, nodesInBounds, keywords, onBoundsChange }) {
   return (
 
     <TweetMap
       tweets={tweets}
       newTweetLocation={newTweetLocation}
       nodesInBounds={nodesInBounds}
+      keywords={keywords}
       onBoundsChange={onBoundsChange}
     />
   );

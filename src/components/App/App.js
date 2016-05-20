@@ -66,17 +66,28 @@ class App extends Component {
       const newState = this.state.tweets.concat(tweet);
       const nodesInBounds = this.state.qtrees[this.state.timeWindow]
               .nodesInBounds(this.state.bounds);
-      this.setState({ tweets: newState, newTweetLocation: tweet.coordinates, nodesInBounds });
+      const keywords = this.getTrendTopics();
+      this.setState({
+        tweets: newState,
+        newTweetLocation: tweet.coordinates,
+        nodesInBounds, keywords,
+      });
     };
     global.setTweets = (tweets, timeWindow) => {
       this.state.qtrees[timeWindow] = new QuadTree([-180, -90, 180, 90], tweets.map(t => ({
         x: t.coordinates.coordinates[0],
         y: t.coordinates.coordinates[1],
         all: t,
-      })));
+      })), (node, item) => {
+        if (!node.freqs) {
+          node.freqs = new WordFrequency(); // eslint-disable-line
+        }
+        node.freqs.add(item.all.text);
+      });
       const nodesInBounds = this.state.qtrees[timeWindow]
               .nodesInBounds(this.state.bounds);
-      this.setState({ tweets, timeWindow, nodesInBounds });
+      const keywords = this.getTrendTopics();
+      this.setState({ tweets, timeWindow, nodesInBounds, keywords });
     };
   }
 
@@ -89,6 +100,15 @@ class App extends Component {
     if (!this.state || !this.state.qtrees[this.state.timeWindow]) return;
     const nodesInBounds = this.state.qtrees[this.state.timeWindow].nodesInBounds(bounds);
     this.setState({ nodesInBounds });
+  }
+
+  getTrendTopics() { // eslint-disable-line
+    if (!this.state.timeWindow) return [];
+    const ary = [];
+    this.state.qtrees[this.state.timeWindow]
+      .root.freqs.freqs.forEach((freq, word) => ary.push([word, freq]));
+    ary.sort((a, b) => (b[1] - a[1]));
+    return ary.slice(0, 5).map(d => d[0]);
   }
 
   render() {
@@ -106,6 +126,7 @@ class App extends Component {
               tweets={this.state.tweets}
               nodesInBounds={this.state.nodesInBounds}
               newTweetLocation={this.state.newTweetLocation}
+              keywords={this.state.keywords}
               onBoundsChange={onBoundsChange}
             />
           </div>

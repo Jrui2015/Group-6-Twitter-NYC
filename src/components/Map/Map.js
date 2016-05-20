@@ -7,6 +7,7 @@ const NYC = [40.7317, -73.9841];
 
 const MIN_RADIUS = 3;
 const radiusScale = d3.scale.sqrt();
+const colorScale = d3.scale.category10();
 
 /* eslint-disable no-param-reassign */
 
@@ -49,8 +50,13 @@ class TweetMap extends Component {
       .attr('id', 'map-overlap')
       .style('transform', 'translate3d(0px, 0px, 100px)')
       .append('svg')
-      .attr('id', 'legend')
-      .append('g');
+      .attr('id', 'legend-layer')
+      .append('g')
+      .attr('id', 'legend');
+
+    d3.select('#legend-layer')
+      .append('g')
+      .attr('id', 'keywords');
 
     const _map = this.map;
     function projectPoint(x, y) {
@@ -99,6 +105,9 @@ class TweetMap extends Component {
     const newLoc = this.props.newTweetLocation ?
             this.props.newTweetLocation.coordinates :
             [Infinity, Infinity];
+
+    let defColor = this.props.keywords.length ? '#ccc' : '#ffd800';
+    this.cScale = colorScale.domain(this.props.keywords);
     this.props.nodesInBounds.forEach(node => node.visit((nd, data, l, t, r, b) => {
       const westNorth = this.path.centroid(makePointFeature([l, b]));
       const eastSouth = this.path.centroid(makePointFeature([r, t]));
@@ -111,6 +120,12 @@ class TweetMap extends Component {
             t <= newLoc[1] && newLoc[1] <= b) {
           this.updatedCluster = nd;
         }
+        this.props.keywords.forEach(k => {
+          if (nd.freqs && nd.freqs.freqs.get(k)) {
+            nd.color = this.cScale(k);
+          }
+        });
+        if (!nd.color) nd.color = defColor;
         clusters.push(nd);
       }
       return isDense;
@@ -119,7 +134,7 @@ class TweetMap extends Component {
   }
 
   redrawSubset(nodes) {
-    if (!nodes.length) return;
+    if (!nodes.length || !this.path) return;
     const features = [].concat(...nodes.map(d => d.geo));
 
     const bounds = this.path.bounds({ type: 'FeatureCollection', features });
@@ -134,6 +149,7 @@ class TweetMap extends Component {
     this.animationLayer.attr('transform', `translate(${-topLeft[0]}, ${-topLeft[1]})`);
 
     const clusters = this.makeClusters();
+    global.clusters = clusters
     const circles = this.g.selectAll('circle')
             .data(clusters, d => d.id);
 
@@ -141,7 +157,6 @@ class TweetMap extends Component {
       .enter()
       .append('circle')
       .style({
-        fill: '#ffd800',
         opacity: 0.6,
       });
 
@@ -150,6 +165,8 @@ class TweetMap extends Component {
       cx: d => d.pixelLocation[0],
       cy: d => d.pixelLocation[1],
       r: d => this.rscale(d.size),
+    }).style({
+      fill: d => d.color,
     });
 
     // animiation for incoming tweets
@@ -166,12 +183,53 @@ class TweetMap extends Component {
             cy: node.pixelLocation[1],
             r,
           })
-          .style({ fill: '#bbc300', opacity: 0.2, stroke: '#bbc300' })
+          .style({ fill: node.color, opacity: 0.2, stroke: '#bbc300' })
           .transition()
           .duration(2000 / scale)
           .attr({ r: r * scale })
           .remove();
       });
+    }
+
+    // top topic list
+    if (this.props.keywords.length) {
+      const g = d3.select('#keywords');
+      const padLeft = 40;
+      const padTop = 30;
+      g.attr('transform', `translate(${padLeft}, ${padTop})`);
+      const list = this.props.keywords.map(kw => ({
+        keyword: kw,
+        color: this.cScale(kw),
+        id: this.props.keywords.indexOf(kw),
+      }));
+      g.selectAll('rect').remove();
+      g.append('rect')
+        .attr({
+          x: 10,
+          y: -padTop - 10,
+          rx: 10,
+          ry: 10,
+          width: 180,
+          height: (padTop + 20) * (this.props.keywords.length - 1),
+        })
+        .style({
+          fill: 'white',
+          opacity: 0.2,
+        });
+      const keywords = g.selectAll('text').data(list, d => d.keyword);
+      keywords
+        .enter()
+        .append('text')
+        .text(d => d.keyword);
+      keywords
+        .attr({
+          x: padLeft,
+          y: d => padTop * d.id,
+        })
+        .style({
+          fill: d => this.cScale(d.keyword),
+          'font-size': 20,
+        });
     }
 
     // legend
@@ -181,8 +239,8 @@ class TweetMap extends Component {
       const pad = 20;
       const height = 2 * pad + legendSize * this.legendScales.length;
       const width = 2 * pad + legendSize + 100;
-      const g = d3.select('#legend').select('g');
-      d3.select('#legend').attr({
+      const g = d3.select('#legend');
+      d3.select('#legend-layer').attr({
         width: mapSize.x,
         height: mapSize.y,
       });
