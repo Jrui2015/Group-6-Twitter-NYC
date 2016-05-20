@@ -5,3 +5,4 @@ node_modules
 .idea
 build
 src/config/
+config.bk
