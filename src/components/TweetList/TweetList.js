@@ -1,13 +1,11 @@
 import React, { PropTypes } from 'react';
+import Tweet from '../Tweet';
 
 function TweetList({ tweets }) {
   return (
-    <div className="App_fill_2Je">
-      {tweets.slice(0, 50).map(tweet => (
-        <blockquote key={tweet.id_str}className="twitter-tweet" data-cards="hidden">
-          <p>{tweet.text}</p>&mdash; {tweet.user.name} (@{tweet.user.screen_name})
-          <a>{tweet.created_at}</a>
-        </blockquote>
+    <div className="App_fill_2Je" id="tweet-list">
+      {tweets.slice(tweets.length - 100).reverse().map(tweet => (
+        <Tweet tweet={tweet} key={tweet.id_str} />
       ))}
       <script async src="//platform.twitter.com/widgets.js"></script>
     </div>
