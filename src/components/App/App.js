@@ -55,6 +55,7 @@ class App extends Component {
     const { insertCss } = this.props.context;
     this.removeCss = insertCss(s);
     global.addTweet = (tweet) => {
+      if (!this.state.qtrees[this.state.timeWindow]) { return; }
       this.state.qtrees[this.state.timeWindow].insert({
         x: tweet.coordinates.coordinates[0],
         y: tweet.coordinates.coordinates[1],
