@@ -1,8 +1,7 @@
 import React, { Component, PropTypes } from 'react';
 import L from 'leaflet-headless';
 import d3 from 'd3';
-import QuadTree from './QuadTree';
-global.QuadTree = QuadTree
+import makePointFeature from './utils';
 
 const NYC = [40.7317, -73.9841];
 
@@ -10,17 +9,6 @@ const MIN_RADIUS = 3;
 const radiusScale = d3.scale.sqrt();
 
 /* eslint-disable no-param-reassign */
-
-function bottomUp(node, base, recursive) {
-  let ret;
-  if (node.leaf) {
-    ret = base(node);
-  } else {
-    const nodes = node.nodes.filter(e => e);
-    ret = recursive(node, nodes);
-  }
-  return ret;
-}
 
 class TweetMap extends Component {
 
@@ -48,7 +36,8 @@ class TweetMap extends Component {
 
     this.g = this.svg
       .append('g')
-      .attr('class', 'leaflet-zoom-hide tweet-locations');
+      .attr('class', 'leaflet-zoom-hide tweet-locations')
+      .attr('id', 'clusters');
 
     const _map = this.map;
     function projectPoint(x, y) {
@@ -60,6 +49,17 @@ class TweetMap extends Component {
     this.path = d3.geo.path().projection(transform);
   }
 
+  _updateRscale() {
+    const size = this.map.getSize();
+    const maxRadius = Math.min(size.x, size.y) / 15;
+    const totalSize = this.props.nodesInBounds
+            .map(d => d.size)
+            .reduce((a, b) => a + b, 0);
+    this.rscale = radiusScale
+      .domain([1, totalSize])
+      .range([MIN_RADIUS, maxRadius]);
+  }
+
   _updateBounds() {
     const bounds = this.map.getBounds();
     this.props.onBoundsChange([bounds.getWest(),
@@ -68,32 +68,22 @@ class TweetMap extends Component {
                                bounds.getNorth()]);
   }
 
-  makeClusters(quadtree) {
+  makeClusters() {
     const clusters = [];
-    const size = this.map.getSize();
-    const maxRadius = Math.min(size.x, size.y) / 15;
-    this.rscale = radiusScale
-            .domain([1, quadtree.size])
-            .range([MIN_RADIUS, maxRadius]);
-    let id = 0;
-    quadtree.visit((node) => {
-      node.id = id++;
-    });
-    quadtree.visit((node, x1, y1, x2, y2) => {
-      const radius = this.rscale(node.size);
-      const bound = Math.min(x2 - x1, y2 - y1) * 0.2;
-      if (bound <= radius) {
-        clusters.push(node);
-        return true;
+    this.props.nodesInBounds.forEach(node => node.visit((nd, data, l, t, r, b) => {
+      const westNorth = this.path.centroid(makePointFeature([l, b]));
+      const eastSouth = this.path.centroid(makePointFeature([r, t]));
+      const bound = Math.min(eastSouth[0] - westNorth[0], eastSouth[1] - westNorth[1]) * 0.2;
+      const radius = this.rscale(nd.size);
+      const isDense = (bound <= radius || nd.isLeaf);
+      if (isDense) {
+        nd.pixelLocation = this.path.centroid(makePointFeature(nd.centroid));
+        clusters.push(nd);
       }
-      if (node.leaf) {
-        clusters.push(node);
-      }
-      return false;
-    });
+      return isDense;
+    }));
     return clusters;
   }
-
 
   redrawSubset(nodes) {
     if (!nodes.length) return;
@@ -109,32 +99,26 @@ class TweetMap extends Component {
       .style('top', `${topLeft[1]}px`);
     this.g.attr('transform', `translate(${-topLeft[0]}, ${-topLeft[1]})`);
 
-    /*
-    const projected = subset.map(feature => ({
-      id_str: feature.id_str,
-      text: feature.text,
-      name: feature.name,
-      x: this.path.centroid(feature)[0],
-      y: this.path.centroid(feature)[1],
-    }));
-    const groups = d3.geom.quadtree(projected);
-    const clusters = this.makeClusters(groups);
-    // TODO use clusters
-    const points = this.g.selectAll('circle')
-          .data(clusters, d => d.id);
-    points.enter().append('circle').style({
-      fill: '#ffd800',
-      opacity: 0.6,
-    });
-    points.exit().remove();
-    points.attr({
-      cx: d => d.cx,
-      cy: d => d.cy,
+    const clusters = this.makeClusters();
+    const circles = this.g.selectAll('circle')
+            .data(clusters, d => d.id);
+
+    circles
+      .enter()
+      .append('circle')
+      .style({
+        fill: '#ffd800',
+        opacity: 0.6,
+      });
+
+    circles.exit().remove();
+    circles.attr({
+      cx: d => d.pixelLocation[0],
+      cy: d => d.pixelLocation[1],
       r: d => this.rscale(d.size),
     });
 
-    points.style('fill-opacity', d => d.group ? (d.group * 0.1) + 0.2 : 1);
-    */
+    /*
     const projected = nodes.map(nd => ({
       topLeft: this.path.centroid(nd.geo[0]),
       bottomRight: this.path.centroid(nd.geo[1]),
@@ -144,13 +128,7 @@ class TweetMap extends Component {
     projected.forEach(d => {
       d.width = d.bottomRight[0] - d.topLeft[0];
       d.height = d.bottomRight[1] - d.topLeft[1];
-      d.centroid = this.path.centroid({
-        type: 'Feature',
-        geometry: {
-          type: 'Point',
-          coordinates: d.node.centroid,
-        },
-      });
+      d.centroid = this.path.centroid(makePointFeature(d.node.centroid));
     });
 
     const rects = this.g.selectAll('rect').data(projected, d => d.id);
@@ -176,20 +154,19 @@ class TweetMap extends Component {
       'text-anchor': 'center',
       fill: 'yellow',
     });
+    //*/
   }
 
 
   render() {
     const nodes = this.props.nodesInBounds;
     if (nodes) {
+      this._updateRscale();
       const rects = nodes.map(nd => ({
-        geo: [{
-          type: 'Feature',
-          geometry: { coordinates: [nd.l, nd.b], type: 'Point' },
-        }, {
-          type: 'Feature',
-          geometry: { coordinates: [nd.r, nd.t], type: 'Point' },
-        }],
+        geo: [
+          makePointFeature([nd.l, nd.b]),
+          makePointFeature([nd.r, nd.t]),
+        ],
         id: nd.id,
         node: nd,
       }));
