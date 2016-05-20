@@ -39,6 +39,11 @@ class TweetMap extends Component {
       .attr('class', 'leaflet-zoom-hide tweet-locations')
       .attr('id', 'clusters');
 
+    this.animationLayer = this.svg
+      .append('g')
+      .attr('class', 'leaflet-zoom-hide animation')
+      .attr('id', 'animation');
+
     const _map = this.map;
     function projectPoint(x, y) {
       const point = _map.latLngToLayerPoint(new L.LatLng(y, x));
@@ -50,6 +55,7 @@ class TweetMap extends Component {
   }
 
   _updateRscale() {
+    if (!this.map) { return; }
     const size = this.map.getSize();
     const maxRadius = Math.min(size.x, size.y) / 15;
     const totalSize = this.props.nodesInBounds
@@ -70,6 +76,9 @@ class TweetMap extends Component {
 
   makeClusters() {
     const clusters = [];
+    const newLoc = this.props.newTweetLocation ?
+            this.props.newTweetLocation.coordinates :
+            [Infinity, Infinity];
     this.props.nodesInBounds.forEach(node => node.visit((nd, data, l, t, r, b) => {
       const westNorth = this.path.centroid(makePointFeature([l, b]));
       const eastSouth = this.path.centroid(makePointFeature([r, t]));
@@ -78,6 +87,10 @@ class TweetMap extends Component {
       const isDense = (bound <= radius || nd.isLeaf);
       if (isDense) {
         nd.pixelLocation = this.path.centroid(makePointFeature(nd.centroid));
+        if (l <= newLoc[0] && newLoc[0] <= r &&
+            t <= newLoc[1] && newLoc[1] <= b) {
+          this.updatedCluster = nd;
+        }
         clusters.push(nd);
       }
       return isDense;
@@ -98,6 +111,7 @@ class TweetMap extends Component {
       .style('left', `${topLeft[0]}px`)
       .style('top', `${topLeft[1]}px`);
     this.g.attr('transform', `translate(${-topLeft[0]}, ${-topLeft[1]})`);
+    this.animationLayer.attr('transform', `translate(${-topLeft[0]}, ${-topLeft[1]})`);
 
     const clusters = this.makeClusters();
     const circles = this.g.selectAll('circle')
@@ -117,6 +131,47 @@ class TweetMap extends Component {
       cy: d => d.pixelLocation[1],
       r: d => this.rscale(d.size),
     });
+
+    if (this.updatedCluster && this.updatedLocation !== this.props.newTweetLocation) {
+      const node = this.updatedCluster;
+      this.updatedCluster = null;
+      const r = this.rscale(node.size);
+      this.updatedLocation = this.props.newTweetLocation;
+      [2.4, 2.7, 3.0].forEach(scale => {
+        d3.select('#animation')
+          .append('circle')
+          .attr({
+            cx: node.pixelLocation[0],
+            cy: node.pixelLocation[1],
+            r,
+          })
+          .style({ fill: '#bbc300', opacity: 0.2, stroke: '#bbc300' })
+          .transition()
+          .duration(2000 / scale)
+          .attr({ r: r * scale })
+          .remove();
+      });
+
+      /*
+      this.animationLayer
+        .selectAll('circle')
+        .data([node])
+        .append('circle')
+        .style({
+          fill: 'red',
+          opacity: 0.4,
+        })
+        .attr({
+          cx: d => d.pixelLocation[0],
+          cy: d => d.pixelLocation[1],
+          r: d => this.rscale(d.size) * 10,
+        })
+        .transition()
+        .attr({
+          r: 1000
+        });
+        //.remove();//*/
+    }
 
     /*
     const projected = nodes.map(nd => ({
