@@ -1,7 +1,7 @@
 import React, { Component, PropTypes } from 'react';
 import L from 'leaflet-headless';
 import d3 from 'd3';
-import QuadTree from './quadtree';
+import QuadTree from './QuadTree';
 global.QuadTree = QuadTree
 
 const NYC = [40.7317, -73.9841];
@@ -193,6 +193,13 @@ class TweetMap extends Component {
     projected.forEach(d => {
       d.width = d.bottomRight[0] - d.topLeft[0];
       d.height = d.bottomRight[1] - d.topLeft[1];
+      d.centroid = this.path.centroid({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: d.node.centroid,
+        },
+      });
     });
 
     const rects = this.g.selectAll('rect').data(projected, d => d.id);
@@ -212,8 +219,8 @@ class TweetMap extends Component {
     sizes.enter().append('text').text(d => d.node.size);
     sizes.exit().remove();
     sizes.attr({
-      x: d => d.topLeft[0] + d.width / 2,
-      y: d => d.topLeft[1] + d.height / 2,
+      x: d => d.centroid[0],
+      y: d => d.centroid[1],
     }).style({
       'text-anchor': 'center',
       fill: 'yellow',
@@ -241,7 +248,8 @@ class TweetMap extends Component {
 
     const bounds = this.state.bounds;
     if (bounds) {
-      let nodes = this.qtree.nodesInBounds([bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()], 0.0000000001);
+      const minWidth = (bounds.getEast() - bounds.getWest()) >> 10;
+      let nodes = this.qtree.nodesInBounds([bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()], minWidth);
       nodes = nodes.map(nd => ({
         geo: [{
           type: 'Feature',

@@ -13,17 +13,18 @@ class Node {
 
     this.id = Node.id++;
     this.size = data ? 1 : 0;
+    this.centroid = data ? [this.data.x, this.data.y] : [0, 0];
   }
 
   find(item, cb) {
     if (isNaN(item.x) || isNaN(item.y)) { return this; }
     let node = this;
-    if (cb) { cb(node); }
+    if (cb) { cb(node, item); }
     while (node.nodes.length) {
       const index = node.findIndex(item);
       if (!node.nodes[index]) break;
       node = node.nodes[index];
-      if (cb) { cb(node); } // update node status along the path
+      if (cb) { cb(node, item); } // update node status along the path
     }
     return node;
   }
@@ -61,12 +62,19 @@ class Node {
     if (this.isLeaf && !this.data) {
       this.data = item;
       this.size++;
+      this.centroid = [item.x, item.y];
       return this;
     }
 
     // case: link identical items to avoid infinite loop
     // case: link items in a very small area (i.e. a point)
-    const leaf = this.find(item, nd => nd.size++);
+    const leaf = this.find(item, nd => {
+      nd.centroid = [
+        (nd.centroid[0] * nd.size + item.x) / (nd.size + 1),
+        (nd.centroid[1] * nd.size + item.y) / (nd.size + 1),
+      ];
+      nd.size++;
+    });
     if ((leaf.data && item.x === leaf.data.x && item.y === leaf.data.y) ||
         (leaf.w === 0 || leaf.h === 0)) {
       leaf.next = { data: item, next: leaf.next };
@@ -94,6 +102,7 @@ class Node {
       if (index === index2) {
         node = node.split(index);
         node.size += 2;
+        node.centroid = [(item.x + item2.x) / 2, (item.y + item2.y) / 2];
       }
     } while (index === index2);
 
@@ -103,14 +112,14 @@ class Node {
   }
 
   // callback: (Node, data, left, top, right, bottom) => noFurtherVisitSubNodes?
-  visit(callback) {
-    if (this.next) {
+  visit(callback, followNext = true) {
+    if (followNext && this.next) {
       for (let point = this.next; point; point = point.next) {
         callback(this, point.data, this.l, this.t, this.r, this.b);
       }
     }
     const stop = callback(this, this.data, this.l, this.t, this.r, this.b);
-    if (!stop) { this.nodes.filter(e => e).forEach(e => e.visit(callback)); }
+    if (!stop) { this.nodes.filter(e => e).forEach(e => e.visit(callback, followNext)); }
   }
 
   nodesInBounds(bounds, minWidth) {
@@ -125,8 +134,25 @@ class Node {
         return true;
       }
       return (r < bl || l > br || b < bt || t > bb);
-    });
+    }, false);
+    // fallback to bigger scope
+    if (!nodes.length) {
+      this.visit((nd, _, l, t, r, b) => {
+        if ((bl <= l && l <= br) ||
+            (bl <= r && r <= br) ||
+            (bt <= t && t <= bb) ||
+            (bt <= b && b <= bb)) {
+          nodes.push(nd);
+          return true;
+        }
+        return (r < bl || l > br || b < bt || t > bb);
+      });
+    }
     return nodes;
+  }
+
+  getNodeNumber() {
+    return Node.id - this.id;
   }
 }
 
