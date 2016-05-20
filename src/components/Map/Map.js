@@ -44,6 +44,14 @@ class TweetMap extends Component {
       .attr('class', 'leaflet-zoom-hide animation')
       .attr('id', 'animation');
 
+    d3.select('.leaflet-control-container')
+      .append('div')
+      .attr('id', 'map-overlap')
+      .style('transform', 'translate3d(0px, 0px, 100px)')
+      .append('svg')
+      .attr('id', 'legend')
+      .append('g');
+
     const _map = this.map;
     function projectPoint(x, y) {
       const point = _map.latLngToLayerPoint(new L.LatLng(y, x));
@@ -57,13 +65,25 @@ class TweetMap extends Component {
   _updateRscale() {
     if (!this.map) { return; }
     const size = this.map.getSize();
-    const maxRadius = Math.min(size.x, size.y) / 15;
-    const totalSize = this.props.nodesInBounds
+    const maxRadius = Math.min(size.x, size.y) / 20;
+    const scales = [];
+    const sizes = [];
+
+    let maxSize = this.props.nodesInBounds
             .map(d => d.size)
-            .reduce((a, b) => a + b, 0);
+            .reduce((a, b) => Math.max(a, b), 0);
+    maxSize = Math.max(50, maxSize);
+
+    for (let r = maxRadius, s = maxSize; r > MIN_RADIUS && s > 1; r /= Math.sqrt(5), s /= 5) {
+      scales.unshift(r);
+      sizes.unshift(s);
+    }
+
+    this.legendScales = scales;
+    this.legendSizes = sizes;
     this.rscale = radiusScale
-      .domain([1, totalSize])
-      .range([MIN_RADIUS, maxRadius]);
+      .domain(sizes)
+      .range(scales);
   }
 
   _updateBounds() {
@@ -82,7 +102,7 @@ class TweetMap extends Component {
     this.props.nodesInBounds.forEach(node => node.visit((nd, data, l, t, r, b) => {
       const westNorth = this.path.centroid(makePointFeature([l, b]));
       const eastSouth = this.path.centroid(makePointFeature([r, t]));
-      const bound = Math.min(eastSouth[0] - westNorth[0], eastSouth[1] - westNorth[1]) * 0.2;
+      const bound = Math.min(eastSouth[0] - westNorth[0], eastSouth[1] - westNorth[1]) * 0.175;
       const radius = this.rscale(nd.size);
       const isDense = (bound <= radius || nd.isLeaf);
       if (isDense) {
@@ -132,6 +152,7 @@ class TweetMap extends Component {
       r: d => this.rscale(d.size),
     });
 
+    // animiation for incoming tweets
     if (this.updatedCluster && this.updatedLocation !== this.props.newTweetLocation) {
       const node = this.updatedCluster;
       this.updatedCluster = null;
@@ -151,27 +172,79 @@ class TweetMap extends Component {
           .attr({ r: r * scale })
           .remove();
       });
-
-      /*
-      this.animationLayer
-        .selectAll('circle')
-        .data([node])
-        .append('circle')
-        .style({
-          fill: 'red',
-          opacity: 0.4,
-        })
-        .attr({
-          cx: d => d.pixelLocation[0],
-          cy: d => d.pixelLocation[1],
-          r: d => this.rscale(d.size) * 10,
-        })
-        .transition()
-        .attr({
-          r: 1000
-        });
-        //.remove();//*/
     }
+
+    // legend
+    if (this.legendScales && this.map) {
+      const mapSize = this.map.getSize();
+      const legendSize = this.legendScales.reverse()[0];
+      const pad = 20;
+      const height = 2 * pad + legendSize * this.legendScales.length;
+      const width = 2 * pad + legendSize + 100;
+      const g = d3.select('#legend').select('g');
+      d3.select('#legend').attr({
+        width: mapSize.x,
+        height: mapSize.y,
+      });
+      g.attr('transform', `translate(${pad}, ${pad + mapSize.y - height})`);
+      g.selectAll('rect').remove();
+      g.append('rect')
+        .attr({
+          x: 0,
+          y: -pad - legendSize * 0.75,
+          width,
+          height: height + legendSize,
+          rx: 10,
+          ry: 10,
+        })
+        .style({
+          fill: 'white',
+          opacity: 0.2,
+        });
+      const legendsObj = this.legendScales.map(d => ({
+        size: d,
+        id: this.legendScales.indexOf(d) + 1,
+      }));
+      const legends = g.selectAll('circle').data(legendsObj, d => d.id);
+      legends
+        .enter()
+        .append('circle');
+
+      legends
+        .attr({
+          cx: legendSize + pad,
+          cy: d => legendSize * d.id - (d.id === 1 ? legendSize * 0.75 : 0),
+          r: d => d.size,
+        })
+        .style({
+          fill: '#ffd800',
+          opacity: 0.8,
+        });
+      legends.exit().remove();
+
+      this.legendSizes.reverse();
+      const legendSizesObj = this.legendSizes.map(d => ({
+        size: d,
+        id: this.legendSizes.indexOf(d) + 1,
+      }));
+      const legendSizes = g.selectAll('text')
+              .data(legendSizesObj, d => d.id);
+      legendSizes
+        .enter()
+        .append('text');
+      legendSizes
+        .text(d => Math.round(d.size))
+        .attr({
+          x: legendSize * 2 + pad + 10,
+          y: d => legendSize * d.id,
+        })
+        .style({
+          fill: 'white',
+          opacity: 0.8,
+        });
+      legendSizes.exit().remove();
+    }
+
 
     /*
     const projected = nodes.map(nd => ({
@@ -230,6 +303,7 @@ class TweetMap extends Component {
 
     return (
       <div id="map" style={{ minHeight: '200px' }} className="App_fill_2Je">
+        <div id="map-overlap" style={{ transform: 'translate3d(0px, 0px, 100px)' }}></div>
       </div>
     );
   }
