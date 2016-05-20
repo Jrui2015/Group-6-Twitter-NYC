@@ -15,6 +15,8 @@ import Footer from '../Footer';
 import Sidebar from '../Sidebar';
 import Main from '../Main';
 import QuadTree from '../Map/QuadTree';
+import WordFrequency from '../../core/word-statistics';
+global.WordFrequency = WordFrequency
 
 class App extends Component {
 
