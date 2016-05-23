@@ -40,6 +40,7 @@
     "react": "^0.14.8",
     "react-dom": "0.14.8",
     "react-leaflet": "^0.11.5",
+    "react-native-listener": "^1.0.1",
     "react-routing": "0.0.7",
     "socket.io": "^1.4.6",
     "source-map-support": "0.4.0",

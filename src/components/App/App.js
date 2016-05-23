@@ -41,6 +41,7 @@ class App extends Component {
       tweets: [],
       nodesInBounds: [],
       qtrees: {},
+      selectedKeywords: [],
     };
   }
 
@@ -66,7 +67,7 @@ class App extends Component {
       const newState = this.state.tweets.concat(tweet);
       const nodesInBounds = this.state.qtrees[this.state.timeWindow]
               .nodesInBounds(this.state.bounds);
-      const keywords = this.getTrendTopics();
+      const keywords = this.getTrendTopics().concat(this.state.selectedKeywords);
       this.setState({
         tweets: newState,
         newTweetLocation: tweet.coordinates,
@@ -86,7 +87,7 @@ class App extends Component {
       });
       const nodesInBounds = this.state.qtrees[timeWindow]
               .nodesInBounds(this.state.bounds);
-      const keywords = this.getTrendTopics();
+      const keywords = this.getTrendTopics().concat(this.state.selectedKeywords);
       this.setState({ tweets, timeWindow, nodesInBounds, keywords });
     };
   }
@@ -102,6 +103,24 @@ class App extends Component {
     this.setState({ nodesInBounds });
   }
 
+  onSearch(event) {
+    event.preventDefault();
+    if (this.state.selectedKeywords.length >= 10) {
+      alert('too many keywords here, please remove some before adding new ones');
+      return;
+    }
+    const qtree = this.state.qtrees[this.state.timeWindow];
+    const freqs = qtree.root.freqs.freqs;
+    const keyword = document.getElementById('keyword').value;
+    const selectedKeywords = this.state.selectedKeywords.concat(keyword);
+    const keywords = this.getTrendTopics().concat(selectedKeywords);
+    if (freqs.get(keyword)) {
+      this.setState({ selectedKeywords, keywords });
+    } else {
+      alert(`"${keyword}" is not in the recent records`);
+    }
+  }
+
   getTrendTopics() { // eslint-disable-line
     if (!this.state.timeWindow) return [];
     const ary = [];
@@ -113,10 +132,11 @@ class App extends Component {
 
   render() {
     this.props.context.onSetTitle('Twitter NYC');
+    const onSearch = this.onSearch.bind(this);
     const onBoundsChange = this.onBoundsChange.bind(this);
     return (
       <div className={s.fill}>
-        <Header />
+        <Header onSearch={onSearch} />
         <div className={s.main}>
           <div className={`col-md-3 ${s.fill}`}>
             <Sidebar tweets={this.state.tweets} />

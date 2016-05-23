@@ -166,7 +166,7 @@ class TweetMap extends Component {
       .enter()
       .append('circle')
       .style({
-        opacity: 0.6,
+        opacity: d => d.color === '#ccc' ? 0.4 : 0.8,
       });
 
     circles.exit().remove();

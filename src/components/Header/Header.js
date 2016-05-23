@@ -8,8 +8,9 @@
  */
 
 import React from 'react';
+import NativeListener from 'react-native-listener';
 
-function Header() {
+function Header({ onSearch }) {
   return (
 
     <nav className="navbar navbar-inverse navbar-static-top">
@@ -22,11 +23,19 @@ function Header() {
           </a>
         </div>
 
-        <div className="collapse navbar-collapse" id="navbar-content">
-          <ul className="nav navbar-nav">
-            <li><a href="#" data-toggle="modal" data-target="#myModal">About</a></li>
-          </ul>
+        <div className="col-sm-3 col-md-3">
+          <form className="navbar-form">
+            <div className="input-group">
+              <input type="text" className="form-control" placeholder="Search keyword..." name="keyword" id="keyword" />
+              <div className="input-group-btn">
+      <NativeListener onClick={onSearch}>
+      <button className="btn btn-default" ><i className="glyphicon glyphicon-search"></i></button>
+      </NativeListener>
+              </div>
+            </div>
+          </form>
         </div>
+
       </div>
     </nav>
 
