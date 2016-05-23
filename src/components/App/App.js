@@ -108,7 +108,7 @@ class App extends Component {
     this.state.qtrees[this.state.timeWindow]
       .root.freqs.freqs.forEach((freq, word) => ary.push([word, freq]));
     ary.sort((a, b) => (b[1] - a[1]));
-    return ary.slice(0, 5).map(d => d[0]);
+    return ary.slice(0, 10).map(d => d[0]);
   }
 
   render() {

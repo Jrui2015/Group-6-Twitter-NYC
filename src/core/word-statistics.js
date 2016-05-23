@@ -184,6 +184,7 @@ const STOPWORDS = new Set([
   'new',
   'york',
   'nyc',
+  'thi',
 ]);
 
 class WordFrequency {

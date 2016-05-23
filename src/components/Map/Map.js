@@ -7,7 +7,7 @@ const NYC = [40.7317, -73.9841];
 
 const MIN_RADIUS = 3;
 const radiusScale = d3.scale.sqrt();
-const colorScale = d3.scale.category10();
+const colorScale = d3.scale.category20();
 
 /* eslint-disable no-param-reassign */
 
@@ -106,27 +106,36 @@ class TweetMap extends Component {
             this.props.newTweetLocation.coordinates :
             [Infinity, Infinity];
 
-    let defColor = this.props.keywords.length ? '#ccc' : '#ffd800';
-    this.cScale = colorScale.domain(this.props.keywords);
+    // let defColor = this.props.keywords.length ? '#ccc' : '#ffd800';
+    let defColor = '#ccc';
+    this.cScale = colorScale.domain(this.props.keywords.slice(0).sort());
     this.props.nodesInBounds.forEach(node => node.visit((nd, data, l, t, r, b) => {
       const westNorth = this.path.centroid(makePointFeature([l, b]));
       const eastSouth = this.path.centroid(makePointFeature([r, t]));
       const bound = Math.min(eastSouth[0] - westNorth[0], eastSouth[1] - westNorth[1]) * 0.175;
       const radius = this.rscale(nd.size);
       const isDense = (bound <= radius || nd.isLeaf);
+      nd.color = defColor;
       if (isDense) {
         nd.pixelLocation = this.path.centroid(makePointFeature(nd.centroid));
         if (l <= newLoc[0] && newLoc[0] <= r &&
             t <= newLoc[1] && newLoc[1] <= b) {
           this.updatedCluster = nd;
         }
-        this.props.keywords.forEach(k => {
+        this.props.keywords.slice(0).reverse().forEach(k => {
+          let haveKeywords = 0;
           if (nd.freqs && nd.freqs.freqs.get(k)) {
+            haveKeywords++;
+          }
+          if (haveKeywords === 1) {
             nd.color = this.cScale(k);
           }
         });
-        if (!nd.color) nd.color = defColor;
-        clusters.push(nd);
+        if (nd.color !== defColor || nd.isLeaf) {
+          clusters.push(nd);
+        } else {
+          return false;
+        }
       }
       return isDense;
     }));
@@ -210,7 +219,7 @@ class TweetMap extends Component {
           rx: 10,
           ry: 10,
           width: 180,
-          height: (padTop + 20) * (this.props.keywords.length - 1),
+          height: (padTop + 8) * (this.props.keywords.length - 1),
         })
         .style({
           fill: 'white',
@@ -221,6 +230,7 @@ class TweetMap extends Component {
         .enter()
         .append('text')
         .text(d => d.keyword);
+      keywords.exit().remove();
       keywords
         .attr({
           x: padLeft,
