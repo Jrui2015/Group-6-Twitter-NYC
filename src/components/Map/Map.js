@@ -19,11 +19,13 @@ class TweetMap extends Component {
     nodesInBounds: PropTypes.array,
     onBoundsChange: PropTypes.func.isRequired,
     onRemoveKeyword: PropTypes.func.isRequired,
+    keywords: PropTypes.array,
   };
 
   constructor(props) {
     super(props);
     this.state = {};
+    this.coloredKeywords = new Array(20);
   }
 
   componentDidMount() {
@@ -107,9 +109,27 @@ class TweetMap extends Component {
             this.props.newTweetLocation.coordinates :
             [Infinity, Infinity];
 
-    // let defColor = this.props.keywords.length ? '#ccc' : '#ffd800';
+    const keywords = this.props.keywords;
+    const colored = this.coloredKeywords;
+    for (let i = 0; i < colored.length; i++) {
+      if (colored[i] && keywords.indexOf(colored[i]) === -1) {
+        colored[i] = undefined;
+      }
+    }
+    keywords.forEach(k => {
+      if (colored.indexOf(k) === -1) {
+        for (let i = 0; i < colored.length; i++) {
+          if (!colored[i]) {
+            colored[i] = k;
+            break;
+          }
+        }
+      }
+    });
+    this.coloredKeywords = colored;
+
     const defColor = '#ccc';
-    this.cScale = colorScale.domain(this.props.keywords.slice(0).sort());
+    this.cScale = colorScale.domain(colored);
     this.props.nodesInBounds.forEach(node => node.visit((nd, data, l, t, r, b) => {
       const westNorth = this.path.centroid(makePointFeature([l, b]));
       const eastSouth = this.path.centroid(makePointFeature([r, t]));
