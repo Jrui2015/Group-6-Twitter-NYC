@@ -138,6 +138,7 @@ class App extends Component {
     if (!qtree) { return []; }
     qtree.root.freqs.freqs.forEach((freq, word) => ary.push([word, freq]));
     ary.sort((a, b) => (b[1] - a[1]));
+global.freqs = ary
     return ary.slice(0, 10).map(d => d[0]);
   }
 

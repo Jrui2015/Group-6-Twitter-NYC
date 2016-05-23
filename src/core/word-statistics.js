@@ -185,10 +185,47 @@ const STOPWORDS = new Set([
   'york',
   'nyc',
   'thi',
+  'get',
+  'eb',
+  'wa',
+  'wb',
+  'sb',
+  'nb',
+  'gt',
+  'it',
+  'de',
+  'st',
+  'le',
+  'one',
+  'now',
+  'ave',
+  'nj',
+  'go',
+  'cr',
+  'u',
+  'rd',
+  'lo',
+  'pa',
+  'du',
+  'xd',
+  'sf',
+  'fe',
+  'cv',
+  'mu',
+  'pu',
+  'et',
+  'ha',
+  'la',
+  'mi',
+  'el',
+  'ni',
+  'er',
+  'hq',
+  'it\'',
 ]);
 
 class WordFrequency {
-  static wordRegex = /[@#]?[\w][\w-_']+/gi;
+  static wordRegex = /[@#]?[\w]*[a-zA-Z]+[\w-_']+/gi;
 
   constructor() {
     this.freqs = new Map();

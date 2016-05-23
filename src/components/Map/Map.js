@@ -7,7 +7,7 @@ const NYC = [40.7317, -73.9841];
 
 const MIN_RADIUS = 3;
 const radiusScale = d3.scale.sqrt();
-const colorScale = d3.scale.category10();
+const colorScale = d3.scale.category20();
 
 /* eslint-disable no-param-reassign */
 
