@@ -16,7 +16,7 @@ function Header() {
       <div className="container-fluid">
         <div className="navbar-header">
           <a className="navbar-brand" href="##">
-            Hot Tweets Finder
+            Hot Topic Finder of Tweets
             &nbsp;
             <span id="fire-icon" className="glyphicon glyphicon-fire"></span>&nbsp;
           </a>
