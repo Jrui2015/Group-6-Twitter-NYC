@@ -7,7 +7,7 @@ const NYC = [40.7317, -73.9841];
 
 const MIN_RADIUS = 3;
 const radiusScale = d3.scale.sqrt();
-const colorScale = d3.scale.category20();
+const colorScale = d3.scale.category10();
 
 /* eslint-disable no-param-reassign */
 
@@ -18,6 +18,7 @@ class TweetMap extends Component {
     newTweetLocation: PropTypes.object,
     nodesInBounds: PropTypes.array,
     onBoundsChange: PropTypes.func.isRequired,
+    onRemoveKeyword: PropTypes.func.isRequired,
   };
 
   constructor(props) {
@@ -26,7 +27,7 @@ class TweetMap extends Component {
   }
 
   componentDidMount() {
-    this.map = L.map('map').setView(NYC, 12);
+    this.map = L.map('map').setView(NYC, 13);
     L.tileLayer('http://{s}.sm.mapstack.stamen.com/(toner-lite,$fff[difference],$fff[@23],$fff[hsl-saturation@20])/{z}/{x}/{y}.png').addTo(this.map);
     this.map.on('moveend', this._updateBounds.bind(this));
     this._updateBounds();
@@ -107,7 +108,7 @@ class TweetMap extends Component {
             [Infinity, Infinity];
 
     // let defColor = this.props.keywords.length ? '#ccc' : '#ffd800';
-    let defColor = '#ccc';
+    const defColor = '#ccc';
     this.cScale = colorScale.domain(this.props.keywords.slice(0).sort());
     this.props.nodesInBounds.forEach(node => node.visit((nd, data, l, t, r, b) => {
       const westNorth = this.path.centroid(makePointFeature([l, b]));
@@ -122,16 +123,14 @@ class TweetMap extends Component {
             t <= newLoc[1] && newLoc[1] <= b) {
           this.updatedCluster = nd;
         }
+        let haveKeywords = 0;
         this.props.keywords.slice(0).reverse().forEach(k => {
-          let haveKeywords = 0;
           if (nd.freqs && nd.freqs.freqs.get(k)) {
             haveKeywords++;
-          }
-          if (haveKeywords === 1) {
             nd.color = this.cScale(k);
           }
         });
-        if (nd.color !== defColor || nd.isLeaf) {
+        if (haveKeywords <= 1 || nd.isLeaf) {
           clusters.push(nd);
         } else {
           return false;
@@ -164,10 +163,7 @@ class TweetMap extends Component {
 
     circles
       .enter()
-      .append('circle')
-      .style({
-        opacity: d => d.color === '#ccc' ? 0.4 : 0.8,
-      });
+      .append('circle');
 
     circles.exit().remove();
     circles.attr({
@@ -176,6 +172,7 @@ class TweetMap extends Component {
       r: d => this.rscale(d.size),
     }).style({
       fill: d => d.color,
+      opacity: d => d.color === '#ccc' ? 0.4 : 0.8,
     });
 
     // animiation for incoming tweets
@@ -219,7 +216,7 @@ class TweetMap extends Component {
           rx: 10,
           ry: 10,
           width: 180,
-          height: (padTop + 8) * (this.props.keywords.length - 1),
+          height: (padTop + 13) * (this.props.keywords.length - 1),
         })
         .style({
           fill: 'white',
@@ -229,6 +226,7 @@ class TweetMap extends Component {
       keywords
         .enter()
         .append('text')
+        .on('click', d => this.props.onRemoveKeyword(d.keyword))
         .text(d => d.keyword);
       keywords.exit().remove();
       keywords

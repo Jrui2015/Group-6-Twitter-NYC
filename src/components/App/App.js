@@ -75,7 +75,15 @@ class App extends Component {
       });
     };
     global.setTweets = (tweets, timeWindow) => {
-      this.state.qtrees[timeWindow] = new QuadTree([-180, -90, 180, 90], tweets.map(t => ({
+      let i = 0;
+      const now = new Date();
+      tweets.forEach(t => {
+        const time = new Date(t.created_at);
+        if (now - time > timeWindow * 60 * 1000) i++;
+        else return;
+      });
+      const recents = tweets.slice(i);
+      this.state.qtrees[timeWindow] = new QuadTree([-180, -90, 180, 90], recents.map(t => ({
         x: t.coordinates.coordinates[0],
         y: t.coordinates.coordinates[1],
         all: t,
@@ -88,8 +96,10 @@ class App extends Component {
       const nodesInBounds = this.state.qtrees[timeWindow]
               .nodesInBounds(this.state.bounds);
       const keywords = this.getTrendTopics().concat(this.state.selectedKeywords);
-      this.setState({ tweets, timeWindow, nodesInBounds, keywords });
+      this.setState({ tweets: recents.slice(0, recents.length - 1), timeWindow, nodesInBounds, keywords });
+      if (recents.length) global.addTweet(recents[recents.length - 1]);
     };
+    this.removeOldTweets(this);
   }
 
   componentWillUnmount() {
@@ -105,7 +115,7 @@ class App extends Component {
 
   onSearch(event) {
     event.preventDefault();
-    if (this.state.selectedKeywords.length >= 10) {
+    if (this.state.selectedKeywords.length >= 5) {
       alert('too many keywords here, please remove some before adding new ones');
       return;
     }
@@ -124,10 +134,26 @@ class App extends Component {
   getTrendTopics() { // eslint-disable-line
     if (!this.state.timeWindow) return [];
     const ary = [];
-    this.state.qtrees[this.state.timeWindow]
-      .root.freqs.freqs.forEach((freq, word) => ary.push([word, freq]));
+    const qtree = this.state.qtrees[this.state.timeWindow];
+    if (!qtree) { return []; }
+    qtree.root.freqs.freqs.forEach((freq, word) => ary.push([word, freq]));
     ary.sort((a, b) => (b[1] - a[1]));
     return ary.slice(0, 10).map(d => d[0]);
+  }
+
+  removeOldTweets(self) {
+    if (self.state.timeWindow) {
+      let i = 0;
+      const now = new Date();
+      const timeWindow = self.state.timeWindow * 60 * 1000;
+      self.state.tweets.forEach(t => {
+        const time = new Date(t.created_at);
+        if (now - time > timeWindow) i++;
+        else return;
+      });
+      global.setTweets(self.state.tweets.slice(i), self.state.timeWindow);
+    }
+    setTimeout(() => self.removeOldTweets(self), 120 * 1000);
   }
 
   render() {

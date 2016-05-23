@@ -18,11 +18,9 @@ export default function startTweetStream(http) {
     console.log('a user connected');
     socket.on('disconnect', () => console.log('user disconnected'));
     Tweet.find({}, {}, {
-      sort: { created_at: -1 },
-      limit: 1000, // TODO find the latest in timeWindow min
     }, (err, docs) => {
       if (err) throw err;
-      io.emit('tweets', [DEF_TIME_WINDOW, docs.map(d => d.tweet)]);
+      io.emit('tweets', [DEF_TIME_WINDOW, docs.slice(docs.length - 1000).map(d => d.tweet)]);
     });
   });
 
